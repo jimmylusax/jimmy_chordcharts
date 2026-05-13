@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>數字簡譜編輯器</title>
+<title>Jimmylusax_script</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -144,11 +144,29 @@ body{font-family:'Georgia',serif;background:#ccc;color:var(--ink);font-size:13px
 .rd{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--ink);}
 .repbar-s .rd1{left:6px;top:calc(50% - 7px);}
 .repbar-s .rd2{left:6px;top:calc(50% + 4px);}
+/* rep end — mirror of rep start, sits inside .barline (position:absolute right:0) */
+.repbar-e{position:absolute;right:0;top:0;bottom:0;width:10px;z-index:3;pointer-events:none;}
+.repbar-e::before{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:var(--ink);}
+.repbar-e::after{content:'';position:absolute;right:4px;top:0;bottom:0;width:1px;background:var(--ink);}
+.repbar-e .rd1{right:6px;top:calc(50% - 7px);}
+.repbar-e .rd2{right:6px;top:calc(50% + 4px);}
+
+/* ── SECTION LABEL on barline ── */
+.barline-sec{
+  position:absolute;
+  top:-22px;left:50%;transform:translateX(-50%);
+  font-size:13px;font-weight:800;
+  border:2.5px solid var(--ink);
+  padding:0 5px;line-height:1.4;letter-spacing:1px;
+  background:#fff;color:var(--ink);
+  white-space:nowrap;pointer-events:none;
+  font-family:Georgia,serif;
+}
 
 /* ── MEASURE HEADER ── */
 .mhdr{
   display:flex;align-items:stretch;flex-wrap:nowrap;gap:0;
-  padding:0;height:30px;min-height:30px;
+  padding:0;height:36px;min-height:36px;
   border-bottom:1px solid var(--border2);
   position:relative;flex-shrink:0;overflow:visible;
 }
@@ -167,7 +185,7 @@ body{font-family:'Georgia',serif;background:#ccc;color:var(--ink);font-size:13px
 }
 .mhdr-beat-cell:first-child{border-left:none;}
 .mhdr-beat-cell:hover{background:rgba(26,58,92,0.04);border-left-color:var(--border2);}
-.mhdr-chord{font-size:16px;font-weight:700;font-family:Georgia,serif;}
+.mhdr-chord{font-size:21px;font-weight:700;font-family:Georgia,serif;text-decoration:underline;}
 .mhdr-beat-input-overlay{
   position:absolute;inset:0;background:rgba(255,255,240,0.97);
   display:flex;align-items:center;padding:0 4px;z-index:30;
@@ -254,8 +272,9 @@ body{font-family:'Georgia',serif;background:#ccc;color:var(--ink);font-size:13px
   position:absolute;right:14px;top:50%;transform:translateY(-50%);
   background:#fff;border:1px solid var(--border);border-radius:6px;
   box-shadow:0 3px 12px rgba(0,0,0,0.15);
-  display:none;flex-direction:column;z-index:50;overflow:hidden;
-  font-family:sans-serif;min-width:130px;
+  display:none;flex-direction:column;z-index:50;
+  overflow-y:auto;max-height:220px;
+  font-family:sans-serif;min-width:150px;
 }
 .barline-menu.open{display:flex;}
 .bm-item{font-size:12px;padding:6px 12px;cursor:pointer;border-bottom:0.5px solid var(--border2);color:var(--ink);}
@@ -1016,10 +1035,9 @@ function makeMeasureEl(m,mi,beats,LANE_H){
   hdr.onclick=e=>{if(activeInput)commitInput();toggleSel(mi);};
   hdr.ondblclick=e=>{if(activeInput)commitInput();openModal(mi);};
 
-  // Left: sec-box, syms, tags — absolute overlay, pointer-events on children only
+  // Left: syms, tags — absolute overlay, pointer-events on children only
   const hdrLeft=document.createElement('div');
   hdrLeft.className='mhdr-left';
-  if(m.sec){const sb=document.createElement('span');sb.className='sec-box';sb.textContent=m.sec;hdrLeft.appendChild(sb);}
   if(m.syms.includes('segno')){const s=document.createElement('span');s.className='mhdr-sym';s.innerHTML=svgSegno(18);hdrLeft.appendChild(s);}
   if(m.syms.includes('coda')){const s=document.createElement('span');s.className='mhdr-sym';s.innerHTML=svgCoda(18);hdrLeft.appendChild(s);}
   if(m.syms.includes('fermata')){const s=document.createElement('span');s.className='mhdr-sym';s.innerHTML=svgFermata(16);hdrLeft.appendChild(s);}
@@ -1258,21 +1276,51 @@ function drawBeams(bCells){
 function makeBarline(m,mi){
   const bl=document.createElement('div');
   const type=m.barline||'normal';
-  bl.className='barline'+({double:' dbl','rep-end':' rep-end-b',final:' final-b'}[type]||'');
-  bl.title='點擊更換線型';
+  bl.className='barline'+({double:' dbl',final:' final-b'}[type]||'');
+  bl.title='點擊更換線型 / 設定段落';
+
   const bli=document.createElement('div'); bli.className='barline-inner';
   bl.appendChild(bli);
 
+  // Rep-end: full DOM structure with dots, same as repbar-s but mirrored
+  if(type==='rep-end'){
+    bl.classList.add('rep-end-b');
+    const re=document.createElement('div'); re.className='repbar-e';
+    re.innerHTML='<div class="rd rd1"></div><div class="rd rd2"></div>';
+    bl.appendChild(re);
+  }
+
+  // ── Section label sits on the barline ──
+  if(m.sec){
+    const sl=document.createElement('div');
+    sl.className='barline-sec';
+    const secColors={Intro:'#555555',A:'#1e3a5f',B:'#7a1e1e',C:'#1e5c2a',D:'#5c4a1e',E:'#3a1e5c'};
+    const col=secColors[m.sec]||'#111';
+    sl.style.borderColor=col;
+    sl.style.color=col;
+    sl.textContent=m.sec;
+    sl.style.pointerEvents='none';
+    bl.appendChild(sl);
+  }
+
   const menu=document.createElement('div');
   menu.className='barline-menu';
-  const opts=[
+  menu.style.minWidth='150px';
+
+  // ── Barline type section ──
+  const blLabel=document.createElement('div');
+  blLabel.style.cssText='font-size:9px;color:#888;padding:4px 12px 2px;font-family:sans-serif;border-bottom:0.5px solid #eee;';
+  blLabel.textContent='小節線型';
+  menu.appendChild(blLabel);
+
+  const lineOpts=[
     {v:'normal',l:'一般小節線'},
     {v:'double',l:'‖ 雙縱線'},
     {v:'rep-end',l:':|| 反覆結束'},
     {v:'final',l:'𝄂 終止線'},
     {v:'_rep-start-next',l:'||: 下節反覆開始'},
   ];
-  opts.forEach(opt=>{
+  lineOpts.forEach(opt=>{
     const item=document.createElement('div');
     item.className='bm-item'+(type===opt.v?' active':'');
     item.textContent=opt.l;
@@ -1292,6 +1340,36 @@ function makeBarline(m,mi){
     };
     menu.appendChild(item);
   });
+
+  // ── Section label section ──
+  const secLabel=document.createElement('div');
+  secLabel.style.cssText='font-size:9px;color:#888;padding:6px 12px 2px;font-family:sans-serif;border-top:1px solid #eee;border-bottom:0.5px solid #eee;margin-top:2px;';
+  secLabel.textContent='段落記號';
+  menu.appendChild(secLabel);
+
+  const secOpts=[
+    {v:'',l:'— 無'},
+    {v:'Intro',l:'Intro'},
+    {v:'A',l:'A 段'},
+    {v:'B',l:'B 段'},
+    {v:'C',l:'C 段'},
+    {v:'D',l:'D 段'},
+    {v:'E',l:'E 段'},
+  ];
+  secOpts.forEach(opt=>{
+    const item=document.createElement('div');
+    item.className='bm-item'+(m.sec===opt.v?' active':'');
+    item.textContent=opt.l;
+    item.onclick=e=>{
+      e.stopPropagation();
+      snapshot();
+      m.sec=opt.v;
+      menu.classList.remove('open');
+      render();
+    };
+    menu.appendChild(item);
+  });
+
   bl.appendChild(menu);
 
   bl.onclick=e=>{
